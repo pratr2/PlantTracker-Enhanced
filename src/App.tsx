@@ -130,6 +130,95 @@ function App() {
     setPestRecords([])
   }
 
+  // Database interaction functions for ChatBot
+  const handleAddPlant = async (plantData: Omit<Plant, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const { error } = await supabase
+        .from('plants')
+        .insert([{ user_id: user.id, ...plantData }])
+      if (error) throw error
+      await loadAllData() // Refresh data after successful operation
+      console.log('Plant added successfully!')
+    } catch (error) {
+      console.error('Error adding plant:', error)
+      alert('Failed to add plant: ' + (error as Error).message)
+    }
+  }
+
+  const handleUpdatePlant = async (plantId: string, updates: Partial<Omit<Plant, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => {
+    try {
+      const { error } = await supabase
+        .from('plants')
+        .update(updates)
+        .eq('id', plantId)
+        .eq('user_id', user.id) // Ensure user owns the plant
+      if (error) throw error
+      await loadAllData()
+      console.log('Plant updated successfully!')
+    } catch (error) {
+      console.error('Error updating plant:', error)
+      alert('Failed to update plant: ' + (error as Error).message)
+    }
+  }
+
+  const handleDeletePlant = async (plantId: string) => {
+    try {
+      const { error } = await supabase
+        .from('plants')
+        .delete()
+        .eq('id', plantId)
+        .eq('user_id', user.id) // Ensure user owns the plant
+      if (error) throw error
+      await loadAllData()
+      console.log('Plant deleted successfully!')
+    } catch (error) {
+      console.error('Error deleting plant:', error)
+      alert('Failed to delete plant: ' + (error as Error).message)
+    }
+  }
+
+  const handleAddFertilizationRecord = async (recordData: Omit<Fertilization, 'id' | 'user_id' | 'created_at'>) => {
+    try {
+      const { error } = await supabase
+        .from('fertilization')
+        .insert([{ user_id: user.id, ...recordData }])
+      if (error) throw error
+      await loadAllData()
+      console.log('Fertilization record added successfully!')
+    } catch (error) {
+      console.error('Error adding fertilization record:', error)
+      alert('Failed to add fertilization record: ' + (error as Error).message)
+    }
+  }
+
+  const handleAddSoilRecord = async (recordData: Omit<SoilHealth, 'id' | 'user_id' | 'created_at'>) => {
+    try {
+      const { error } = await supabase
+        .from('soil_health')
+        .insert([{ user_id: user.id, ...recordData }])
+      if (error) throw error
+      await loadAllData()
+      console.log('Soil record added successfully!')
+    } catch (error) {
+      console.error('Error adding soil record:', error)
+      alert('Failed to add soil record: ' + (error as Error).message)
+    }
+  }
+
+  const handleAddPestControlRecord = async (recordData: Omit<PestControl, 'id' | 'user_id' | 'created_at'>) => {
+    try {
+      const { error } = await supabase
+        .from('pest_control')
+        .insert([{ user_id: user.id, ...recordData }])
+      if (error) throw error
+      await loadAllData()
+      console.log('Pest control record added successfully!')
+    } catch (error) {
+      console.error('Error adding pest control record:', error)
+      alert('Failed to add pest control record: ' + (error as Error).message)
+    }
+  }
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'soil', label: 'Soil Health', icon: Droplets },
@@ -323,7 +412,15 @@ function App() {
       </main>
 
       {/* ChatBot - Fixed position, always visible */}
-      <ChatBot userId={user.id} />
+      <ChatBot 
+        userId={user.id}
+        onAddPlant={handleAddPlant}
+        onUpdatePlant={handleUpdatePlant}
+        onDeletePlant={handleDeletePlant}
+        onAddFertilization={handleAddFertilizationRecord}
+        onAddSoil={handleAddSoilRecord}
+        onAddPestControl={handleAddPestControlRecord}
+      />
     </div>
   )
 }

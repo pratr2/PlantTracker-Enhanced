@@ -2,12 +2,27 @@ import React, { useState, useRef, useEffect } from 'react'
 import { MessageCircle, Send, X, Minimize2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { ChatMessage } from '../types/database'
+import { Plant, Fertilization, SoilHealth, PestControl } from '../types/Plant'
 
 interface ChatBotProps {
   userId: string
+  onAddPlant: (plantData: Omit<Plant, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  onUpdatePlant: (plantId: string, updates: Partial<Omit<Plant, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => Promise<void>
+  onDeletePlant: (plantId: string) => Promise<void>
+  onAddFertilization: (recordData: Omit<Fertilization, 'id' | 'user_id' | 'created_at'>) => Promise<void>
+  onAddSoil: (recordData: Omit<SoilHealth, 'id' | 'user_id' | 'created_at'>) => Promise<void>
+  onAddPestControl: (recordData: Omit<PestControl, 'id' | 'user_id' | 'created_at'>) => Promise<void>
 }
 
-export const ChatBot: React.FC<ChatBotProps> = ({ userId }) => {
+export const ChatBot: React.FC<ChatBotProps> = ({ 
+  userId, 
+  onAddPlant, 
+  onUpdatePlant, 
+  onDeletePlant, 
+  onAddFertilization, 
+  onAddSoil, 
+  onAddPestControl 
+}) => {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -86,10 +101,47 @@ export const ChatBot: React.FC<ChatBotProps> = ({ userId }) => {
         throw new Error('Failed to get AI response')
       }
 
+      const assistantRawContent = response.data.choices?.[0]?.message?.content || 'Sorry, I encountered an error generating a response.'
+      let aiMessageContent = assistantRawContent // Default to raw AI response
+
+      try {
+        const parsedResponse = JSON.parse(assistantRawContent)
+        if (parsedResponse.type === 'action') {
+          aiMessageContent = parsedResponse.message // Use the message from the structured response
+          switch (parsedResponse.action) {
+            case 'addPlant':
+              await onAddPlant(parsedResponse.data)
+              break
+            case 'updatePlant':
+              await onUpdatePlant(parsedResponse.data.id, parsedResponse.data.updates)
+              break
+            case 'deletePlant':
+              await onDeletePlant(parsedResponse.data.id)
+              break
+            case 'addFertilization':
+              await onAddFertilization(parsedResponse.data)
+              break
+            case 'addSoil':
+              await onAddSoil(parsedResponse.data)
+              break
+            case 'addPestControl':
+              await onAddPestControl(parsedResponse.data)
+              break
+            default:
+              console.warn('Unknown action type from AI:', parsedResponse.action)
+          }
+        } else if (parsedResponse.type === 'chat') {
+          aiMessageContent = parsedResponse.message
+        }
+      } catch (e) {
+        // If parsing fails, it's not a structured JSON response, treat as plain chat message
+        console.log('AI response was not structured JSON, treating as plain text.')
+      }
+
       const assistantMessage: Omit<ChatMessage, 'id' | 'created_at'> = {
         user_id: userId,
         role: 'assistant',
-        content: response.data.choices?.[0]?.message?.content || 'Sorry, I encountered an error generating a response.',
+        content: aiMessageContent, // Use the potentially updated message
         timestamp: new Date().toISOString()
       }
 
@@ -106,7 +158,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ userId }) => {
         id: Date.now().toString() + '_error',
         user_id: userId,
         role: 'assistant',
-        content: 'Sorry, I encountered an error connecting to the AI assistant. Please try again.',
+        content: 'Sorry, I encountered an error connecting to the AI assistant or processing its response. Please try again.',
         timestamp: new Date().toISOString()
       }])
     } finally {
