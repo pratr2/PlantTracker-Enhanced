@@ -1,185 +1,164 @@
 import React, { useState } from 'react';
-import { Leaf, Sprout, Bug, Mountain, Menu, X } from 'lucide-react';
-
-// Simple working app first
-const samplePlants = [
-  {
-    id: '1',
-    name: 'Monstera Deliciosa',
-    species: 'Monstera deliciosa',
-    location: 'Living Room',
-    imageUrl: 'https://images.pexels.com/photos/6912775/pexels-photo-6912775.jpeg?auto=compress&cs=tinysrgb&w=800',
-    healthStatus: 'excellent'
-  },
-  {
-    id: '2',
-    name: 'Snake Plant',
-    species: 'Sansevieria trifasciata',
-    location: 'Bedroom',
-    imageUrl: 'https://images.pexels.com/photos/4751978/pexels-photo-4751978.jpeg?auto=compress&cs=tinysrgb&w=800',
-    healthStatus: 'good'
-  }
-];
+import { Leaf, Eye, EyeOff } from 'lucide-react';
 
 function App() {
-  const [currentView, setCurrentView] = useState('fertilization');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
 
-  const navigation = [
-    { id: 'fertilization', label: 'Fertilization', icon: Sprout, color: 'text-green-600' },
-    { id: 'pest', label: 'Pest Control', icon: Bug, color: 'text-orange-600' },
-    { id: 'soil', label: 'Soil Analysis', icon: Mountain, color: 'text-amber-600' },
-  ];
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Simple validation - in real app, this would connect to authentication service
+    if (formData.email && formData.password) {
+      setIsLoggedIn(true);
+    }
+  };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+  if (isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
                   <Leaf className="w-5 h-5 text-white" />
                 </div>
                 <h1 className="text-xl font-bold text-gray-900">PlantTracker</h1>
               </div>
+              <button
+                onClick={() => setIsLoggedIn(false)}
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Logout
+              </button>
             </div>
+          </div>
+        </header>
+
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Leaf className="w-8 h-8 text-emerald-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to PlantTracker</h1>
+            <p className="text-gray-600 mb-8">Your plant maintenance tracking system is ready!</p>
             
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex space-x-8">
-              {navigation.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setCurrentView(item.id)}
-                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      currentView === item.id
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 mr-2 ${currentView === item.id ? 'text-emerald-600' : item.color}`} />
-                    {item.label}
-                  </button>
-                );
-              })}
-            </nav>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+              <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🌱</span>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Fertilization Tracker</h3>
+                <p className="text-gray-600 text-sm">Track weekly fertilization records and monitor plant nutrition</p>
+              </div>
 
-            {/* Mobile Menu Button */}
+              <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🐛</span>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Pest Control</h3>
+                <p className="text-gray-600 text-sm">Monitor pest issues and track treatment effectiveness</p>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
+                <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🌍</span>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Soil Analysis</h3>
+                <p className="text-gray-600 text-sm">Monitor soil TDS and pH levels for optimal growth</p>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        {/* Logo and Title */}
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <Leaf className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">PlantTracker</h1>
+          <p className="text-gray-600">Track your plant maintenance with ease</p>
+        </div>
+
+        {/* Login Form */}
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Welcome Back</h2>
+          
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                placeholder="Enter your email"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={formData.password}
+                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
             <button
-              className="md:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              type="submit"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl"
             >
-              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              Sign In
             </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <button className="text-emerald-600 hover:text-emerald-700 font-medium">
+                Sign up
+              </button>
+            </p>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 bg-white">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {navigation.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setCurrentView(item.id);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`flex items-center w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      currentView === item.id
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 mr-2 ${currentView === item.id ? 'text-emerald-600' : item.color}`} />
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Sprout className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {currentView === 'fertilization' && 'Fertilization Tracker'}
-                  {currentView === 'pest' && 'Pest Status & Treatment Tracker'}
-                  {currentView === 'soil' && 'Soil TDS & pH Tracker'}
-                </h1>
-                <p className="text-gray-600">
-                  {currentView === 'fertilization' && 'Track weekly fertilization records for your plants'}
-                  {currentView === 'pest' && 'Monitor pest issues and track treatment effectiveness'}
-                  {currentView === 'soil' && 'Monitor soil conditions and nutrient levels'}
-                </p>
-              </div>
-            </div>
-            <button className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-              <span className="text-lg">+</span>
-              Add Plant
-            </button>
-          </div>
-
-          {/* Plants Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {samplePlants.map(plant => (
-              <div key={plant.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="relative h-32">
-                  <img 
-                    src={plant.imageUrl} 
-                    alt={plant.name}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                  <div className="absolute bottom-2 left-3 text-white">
-                    <h3 className="font-semibold">{plant.name}</h3>
-                    <p className="text-sm opacity-90">{plant.species}</p>
-                  </div>
-                </div>
-
-                <div className="p-4">
-                  <div className="mb-4 p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-green-700">
-                        {currentView === 'fertilization' && 'Latest Fertilization'}
-                        {currentView === 'pest' && 'Latest Treatment'}
-                        {currentView === 'soil' && 'Latest Measurements'}
-                      </span>
-                      <span className="text-xs text-green-600">Dec 20, 2024</span>
-                    </div>
-                    <div className="text-sm text-gray-700">
-                      {currentView === 'fertilization' && 'NPK 20-20-20 • 1:1000 dilution'}
-                      {currentView === 'pest' && 'No pest issues recorded'}
-                      {currentView === 'soil' && 'TDS: 850 ppm • pH: 6.2'}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Previous Records</h4>
-                    <div className="text-xs text-gray-500 text-center py-2">
-                      No previous records
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Demo Credentials */}
+        <div className="mt-6 bg-white/50 backdrop-blur-sm rounded-lg p-4 text-center">
+          <p className="text-sm text-gray-600 mb-2">Demo Credentials:</p>
+          <p className="text-xs text-gray-500">
+            Email: demo@planttracker.com<br />
+            Password: demo123
+          </p>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
