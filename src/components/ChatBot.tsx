@@ -89,7 +89,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ userId }) => {
       const assistantMessage: Omit<ChatMessage, 'id' | 'created_at'> = {
         user_id: userId,
         role: 'assistant',
-        content: response.data.response || 'Sorry, I encountered an error generating a response.',
+        content: response.data.choices?.[0]?.message?.content || 'Sorry, I encountered an error generating a response.',
         timestamp: new Date().toISOString()
       }
 
