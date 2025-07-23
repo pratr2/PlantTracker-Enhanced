@@ -268,8 +268,8 @@ export const PestTracker: React.FC<PestTrackerProps> = ({
                         {plantRecords.length} records
                       </td>
                     </tr>
-                  )}
-                )}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -295,6 +295,7 @@ export const PestTracker: React.FC<PestTrackerProps> = ({
                       </div>
                     </div>
                   </div>
+                </div>
                 {/* Latest Pest Control Data */}
                 <div className="p-6">
                   {latestRecord ? (
@@ -339,7 +340,7 @@ export const PestTracker: React.FC<PestTrackerProps> = ({
           })}
         </div>
       )}
-                </div>
+
       {plants.length === 0 && (
         <div className="bg-white rounded-xl shadow-md p-12 text-center">
           <Bug className="w-16 h-16 text-gray-400 mx-auto mb-4" />

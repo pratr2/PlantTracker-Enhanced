@@ -268,8 +268,8 @@ export const FertilizationTracker: React.FC<FertilizationTrackerProps> = ({
                         {plantRecords.length} records
                       </td>
                     </tr>
-                  )}
-                )}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -295,6 +295,7 @@ export const FertilizationTracker: React.FC<FertilizationTrackerProps> = ({
                       </div>
                     </div>
                   </div>
+                </div>
                 {/* Latest Fertilization Data */}
                 <div className="p-6">
                   {latestRecord ? (
@@ -338,7 +339,7 @@ export const FertilizationTracker: React.FC<FertilizationTrackerProps> = ({
           })}
         </div>
       )}
-                </div>
+
       {plants.length === 0 && (
         <div className="bg-white rounded-xl shadow-md p-12 text-center">
           <Sprout className="w-16 h-16 text-gray-400 mx-auto mb-4" />
