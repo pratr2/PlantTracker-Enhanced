@@ -65,19 +65,22 @@ export const ChatBot: React.FC<ChatBotProps> = ({ userId }) => {
       await supabase.from('chat_messages').insert([userMessage])
 
       // Call edge function for ChatGPT response
-      const { data, error } = await supabase.functions.invoke('chat-gpt', {
+      const response = await supabase.functions.invoke('chat-gpt', {
         body: { 
           message: inputMessage.trim(),
           userId: userId
         }
       })
 
-      if (error) throw error
+      if (response.error) {
+        console.error('Edge function error:', response.error)
+        throw new Error('Failed to get AI response')
+      }
 
       const assistantMessage: Omit<ChatMessage, 'id' | 'created_at'> = {
         user_id: userId,
         role: 'assistant',
-        content: data.response,
+        content: response.data.response || 'Sorry, I encountered an error generating a response.',
         timestamp: new Date().toISOString()
       }
 
@@ -94,7 +97,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ userId }) => {
         id: Date.now().toString() + '_error',
         user_id: userId,
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: 'Sorry, I encountered an error connecting to the AI assistant. Please try again.',
         timestamp: new Date().toISOString()
       }])
     } finally {
