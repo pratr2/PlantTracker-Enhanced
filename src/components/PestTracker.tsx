@@ -1,83 +1,76 @@
-import React, { useState } from 'react';
-import { Plant, PestRecord } from '../types/Plant';
-import { QuickAddPlant } from './QuickAddPlant';
-import { Bug, Plus, Calendar, Shield, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { Plant, PestControl } from '../types/Plant'
+import { Bug, Plus, Calendar, Shield } from 'lucide-react'
 
 interface PestTrackerProps {
-  plants: Plant[];
-  records: PestRecord[];
-  onAddPlant: (plant: Omit<Plant, 'id'>) => void;
-  onAddRecord: (record: Omit<PestRecord, 'id'>) => void;
-  getLatestRecord: (plantId: string) => PestRecord | undefined;
-  getRecordsForPlant: (plantId: string) => PestRecord[];
+  plants: Plant[]
+  pestRecords: PestControl[]
+  userId: string
+  onDataChange: () => void
 }
 
 export const PestTracker: React.FC<PestTrackerProps> = ({
   plants,
-  onAddPlant,
-  onAddRecord,
-  getLatestRecord,
-  getRecordsForPlant
+  pestRecords,
+  userId,
+  onDataChange
 }) => {
-  const [selectedPlant, setSelectedPlant] = useState<string>('');
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false)
   const [formData, setFormData] = useState({
-    pestType: '',
-    severity: 'low' as PestRecord['severity'],
-    treatmentUsed: '',
-    treatmentMethod: '',
-    effectiveness: 'pending' as PestRecord['effectiveness'],
+    plant_name: '',
+    pest_type: '',
+    treatment: '',
+    method: '',
     notes: ''
-  });
+  })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPlant || !formData.pestType) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.plant_name || !formData.treatment) return
 
-    onAddRecord({
-      plantId: selectedPlant,
-      date: new Date().toISOString().split('T')[0],
-      ...formData
-    });
+    try {
+      const pestData = {
+        user_id: userId,
+        plant_name: formData.plant_name,
+        date: new Date().toISOString().split('T')[0],
+        pest_type: formData.pest_type || null,
+        treatment: formData.treatment,
+        method: formData.method || null,
+        notes: formData.notes || null
+      }
 
-    setFormData({
-      pestType: '',
-      severity: 'low',
-      treatmentUsed: '',
-      treatmentMethod: '',
-      effectiveness: 'pending',
-      notes: ''
-    });
-    setShowAddForm(false);
-  };
+      const { error } = await supabase
+        .from('pest_control')
+        .insert([pestData])
+
+      if (error) throw error
+
+      setFormData({
+        plant_name: '',
+        pest_type: '',
+        treatment: '',
+        method: '',
+        notes: ''
+      })
+      setShowAddForm(false)
+      onDataChange()
+    } catch (error) {
+      console.error('Error saving pest control record:', error)
+    }
+  }
+
+  const getRecordsForPlant = (plantName: string) => {
+    return pestRecords.filter(record => record.plant_name === plantName)
+  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric',
       year: 'numeric'
-    });
-  };
-
-  const getSeverityColor = (severity: PestRecord['severity']) => {
-    switch (severity) {
-      case 'low': return 'text-yellow-600 bg-yellow-100';
-      case 'medium': return 'text-orange-600 bg-orange-100';
-      case 'high': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
-
-  const getEffectivenessColor = (effectiveness: PestRecord['effectiveness']) => {
-    switch (effectiveness) {
-      case 'excellent': return 'text-emerald-600 bg-emerald-100';
-      case 'good': return 'text-green-600 bg-green-100';
-      case 'fair': return 'text-yellow-600 bg-yellow-100';
-      case 'poor': return 'text-red-600 bg-red-100';
-      case 'pending': return 'text-blue-600 bg-blue-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -88,26 +81,23 @@ export const PestTracker: React.FC<PestTrackerProps> = ({
             <Bug className="w-6 h-6 text-orange-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Pest Status & Treatment Tracker</h1>
-            <p className="text-gray-600">Monitor pest issues and track treatment effectiveness</p>
+            <h1 className="text-2xl font-bold text-gray-900">Pest Control History</h1>
+            <p className="text-gray-600">Track pest issues and treatment records</p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <QuickAddPlant onAdd={onAddPlant} />
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Record
-          </button>
-        </div>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Add Record
+        </button>
       </div>
 
       {/* Add Record Form */}
       {showAddForm && (
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-orange-500">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Pest Treatment Record</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Pest Control Record</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -116,92 +106,56 @@ export const PestTracker: React.FC<PestTrackerProps> = ({
                 </label>
                 <select
                   required
-                  value={selectedPlant}
-                  onChange={(e) => setSelectedPlant(e.target.value)}
+                  value={formData.plant_name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, plant_name: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 >
                   <option value="">Choose a plant...</option>
                   {plants.map(plant => (
-                    <option key={plant.id} value={plant.id}>
-                      {plant.name} ({plant.species})
+                    <option key={plant.id} value={plant.plant_name}>
+                      {plant.plant_name} ({plant.plant_type})
                     </option>
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Pest Type *
+                  Pest Type
                 </label>
                 <input
                   type="text"
-                  required
-                  value={formData.pestType}
-                  onChange={(e) => setFormData(prev => ({ ...prev, pestType: e.target.value }))}
+                  value={formData.pest_type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   placeholder="e.g., Spider Mites, Aphids, Scale"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Severity Level
-                </label>
-                <select
-                  value={formData.severity}
-                  onChange={(e) => setFormData(prev => ({ ...prev, severity: e.target.value as PestRecord['severity'] }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Treatment Used
+                  Treatment Used *
                 </label>
                 <input
                   type="text"
-                  value={formData.treatmentUsed}
-                  onChange={(e) => setFormData(prev => ({ ...prev, treatmentUsed: e.target.value }))}
+                  required
+                  value={formData.treatment}
+                  onChange={(e) => setFormData(prev => ({ ...prev, treatment: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   placeholder="e.g., Neem Oil, Insecticidal Soap"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Treatment Method
+                  Method
                 </label>
                 <input
                   type="text"
-                  value={formData.treatmentMethod}
-                  onChange={(e) => setFormData(prev => ({ ...prev, treatmentMethod: e.target.value }))}
+                  value={formData.method}
+                  onChange={(e) => setFormData(prev => ({ ...prev, method: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   placeholder="e.g., Foliar spray, Soil drench"
                 />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Treatment Effectiveness
-                </label>
-                <select
-                  value={formData.effectiveness}
-                  onChange={(e) => setFormData(prev => ({ ...prev, effectiveness: e.target.value as PestRecord['effectiveness'] }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="excellent">Excellent</option>
-                  <option value="good">Good</option>
-                  <option value="fair">Fair</option>
-                  <option value="poor">Poor</option>
-                </select>
-              </div>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Notes
@@ -211,10 +165,9 @@ export const PestTracker: React.FC<PestTrackerProps> = ({
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                placeholder="Observations, follow-up actions, etc..."
+                placeholder="Observations, effectiveness, follow-up actions..."
               />
             </div>
-
             <div className="flex gap-3">
               <button
                 type="button"
@@ -234,112 +187,86 @@ export const PestTracker: React.FC<PestTrackerProps> = ({
         </div>
       )}
 
-      {/* Plants Grid */}
-      {plants.length === 0 ? (
+      {/* Plants List with Pest Control History */}
+      <div className="space-y-6">
+        {plants.map(plant => {
+          const plantRecords = getRecordsForPlant(plant.plant_name)
+          
+          return (
+            <div key={plant.id} className="bg-white rounded-xl shadow-md overflow-hidden">
+              {/* Plant Header */}
+              <div className="bg-gray-50 px-6 py-4 border-b">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{plant.plant_name}</h3>
+                    <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                      {plant.plant_type && <span>Type: {plant.plant_type}</span>}
+                      {plant.pot_size && <span>Size: {plant.pot_size}</span>}
+                      {plant.location && <span>Location: {plant.location}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pest Control Records */}
+              <div className="p-6">
+                {plantRecords.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Shield className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600">No pest control records</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Pest Control History ({plantRecords.length} records)
+                    </h4>
+                    <div className="grid gap-3">
+                      {plantRecords.map(record => (
+                        <div key={record.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-sm font-medium text-gray-900">
+                              {formatDate(record.date)}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {record.pest_type && (
+                              <div className="flex items-center gap-2">
+                                <Bug className="w-4 h-4 text-orange-500" />
+                                <span className="text-sm font-medium text-gray-700">Pest: {record.pest_type}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <Shield className="w-4 h-4 text-blue-500" />
+                              <span className="text-sm font-medium text-gray-700">Treatment: {record.treatment}</span>
+                            </div>
+                            {record.method && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Method:</span> {record.method}
+                              </div>
+                            )}
+                            {record.notes && (
+                              <p className="text-sm text-gray-600 italic">{record.notes}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {plants.length === 0 && (
         <div className="bg-white rounded-xl shadow-md p-12 text-center">
           <Bug className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No plants yet</h3>
-          <p className="text-gray-600 mb-6">Add your first plant to start tracking pest status</p>
-          <QuickAddPlant onAdd={onAddPlant} />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {plants.map(plant => {
-            const latestRecord = getLatestRecord(plant.id);
-            const allRecords = getRecordsForPlant(plant.id);
-            
-            return (
-              <div key={plant.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="relative h-32">
-                  <img 
-                    src={plant.imageUrl} 
-                    alt={plant.name}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                  <div className="absolute bottom-2 left-3 text-white">
-                    <h3 className="font-semibold">{plant.name}</h3>
-                    <p className="text-sm opacity-90">{plant.species}</p>
-                  </div>
-                </div>
-
-                <div className="p-4">
-                  {/* Current Status */}
-                  {latestRecord ? (
-                    <div className="mb-4 p-3 bg-orange-50 rounded-lg border-l-4 border-orange-500">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-orange-700">Latest Treatment</span>
-                        <span className="text-xs text-orange-600">{formatDate(latestRecord.date)}</span>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Bug className="w-4 h-4 text-orange-600" />
-                          <span className="text-gray-700">{latestRecord.pestType}</span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(latestRecord.severity)}`}>
-                            {latestRecord.severity}
-                          </span>
-                        </div>
-                        {latestRecord.treatmentUsed && (
-                          <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-blue-500" />
-                            <span className="text-gray-700">{latestRecord.treatmentUsed}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600">Effectiveness:</span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEffectivenessColor(latestRecord.effectiveness)}`}>
-                            {latestRecord.effectiveness}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mb-4 p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-green-600" />
-                        <span className="text-sm text-green-700 font-medium">No pest issues recorded</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Previous Records */}
-                  {allRecords.length > 1 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        Previous Records ({allRecords.length - 1})
-                      </h4>
-                      <div className="space-y-2 max-h-32 overflow-y-auto">
-                        {allRecords.slice(1, 4).map(record => (
-                          <div key={record.id} className="text-xs bg-gray-50 p-2 rounded">
-                            <div className="flex justify-between items-start mb-1">
-                              <span className="font-medium text-gray-700">{record.pestType}</span>
-                              <span className="text-gray-500">{formatDate(record.date)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`px-1 py-0.5 rounded text-xs ${getSeverityColor(record.severity)}`}>
-                                {record.severity}
-                              </span>
-                              <span className={`px-1 py-0.5 rounded text-xs ${getEffectivenessColor(record.effectiveness)}`}>
-                                {record.effectiveness}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                        {allRecords.length > 4 && (
-                          <div className="text-xs text-gray-500 text-center py-1">
-                            +{allRecords.length - 4} more records
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          <p className="text-gray-600">Add plants in the Overview tab to start tracking pest control</p>
         </div>
       )}
     </div>
-  );
-};
+  )
+}

@@ -1,59 +1,76 @@
-import React, { useState } from 'react';
-import { Plant, FertilizationRecord } from '../types/Plant';
-import { QuickAddPlant } from './QuickAddPlant';
-import { Sprout, Plus, Calendar, Beaker, Droplets } from 'lucide-react';
+import React, { useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { Plant, Fertilization } from '../types/Plant'
+import { Sprout, Plus, Calendar, Beaker } from 'lucide-react'
 
 interface FertilizationTrackerProps {
-  plants: Plant[];
-  records: FertilizationRecord[];
-  onAddPlant: (plant: Omit<Plant, 'id'>) => void;
-  onAddRecord: (record: Omit<FertilizationRecord, 'id'>) => void;
-  getLatestRecord: (plantId: string) => FertilizationRecord | undefined;
-  getRecordsForPlant: (plantId: string) => FertilizationRecord[];
+  plants: Plant[]
+  fertilizationRecords: Fertilization[]
+  userId: string
+  onDataChange: () => void
 }
 
 export const FertilizationTracker: React.FC<FertilizationTrackerProps> = ({
   plants,
-  onAddPlant,
-  onAddRecord,
-  getLatestRecord,
-  getRecordsForPlant
+  fertilizationRecords,
+  userId,
+  onDataChange
 }) => {
-  const [selectedPlant, setSelectedPlant] = useState<string>('');
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false)
   const [formData, setFormData] = useState({
-    fertilizerType: '',
-    concentration: '',
-    method: 'soil' as FertilizationRecord['method'],
+    plant_name: '',
+    fertilizer_type: '',
+    dosage: '',
+    method: '',
     notes: ''
-  });
+  })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPlant || !formData.fertilizerType) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.plant_name || !formData.fertilizer_type) return
 
-    onAddRecord({
-      plantId: selectedPlant,
-      date: new Date().toISOString().split('T')[0],
-      ...formData
-    });
+    try {
+      const fertData = {
+        user_id: userId,
+        plant_name: formData.plant_name,
+        date: new Date().toISOString().split('T')[0],
+        fertilizer_type: formData.fertilizer_type,
+        dosage: formData.dosage || null,
+        method: formData.method || null,
+        notes: formData.notes || null
+      }
 
-    setFormData({
-      fertilizerType: '',
-      concentration: '',
-      method: 'soil',
-      notes: ''
-    });
-    setShowAddForm(false);
-  };
+      const { error } = await supabase
+        .from('fertilization')
+        .insert([fertData])
+
+      if (error) throw error
+
+      setFormData({
+        plant_name: '',
+        fertilizer_type: '',
+        dosage: '',
+        method: '',
+        notes: ''
+      })
+      setShowAddForm(false)
+      onDataChange()
+    } catch (error) {
+      console.error('Error saving fertilization record:', error)
+    }
+  }
+
+  const getRecordsForPlant = (plantName: string) => {
+    return fertilizationRecords.filter(record => record.plant_name === plantName)
+  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric',
       year: 'numeric'
-    });
-  };
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -64,20 +81,17 @@ export const FertilizationTracker: React.FC<FertilizationTrackerProps> = ({
             <Sprout className="w-6 h-6 text-green-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Fertilization Tracker</h1>
-            <p className="text-gray-600">Track weekly fertilization records for your plants</p>
+            <h1 className="text-2xl font-bold text-gray-900">Fertilization History</h1>
+            <p className="text-gray-600">Track fertilization records and feeding schedules</p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <QuickAddPlant onAdd={onAddPlant} />
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Record
-          </button>
-        </div>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Add Record
+        </button>
       </div>
 
       {/* Add Record Form */}
@@ -92,19 +106,18 @@ export const FertilizationTracker: React.FC<FertilizationTrackerProps> = ({
                 </label>
                 <select
                   required
-                  value={selectedPlant}
-                  onChange={(e) => setSelectedPlant(e.target.value)}
+                  value={formData.plant_name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, plant_name: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 >
                   <option value="">Choose a plant...</option>
                   {plants.map(plant => (
-                    <option key={plant.id} value={plant.id}>
-                      {plant.name} ({plant.species})
+                    <option key={plant.id} value={plant.plant_name}>
+                      {plant.plant_name} ({plant.plant_type})
                     </option>
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Fertilizer Type *
@@ -112,42 +125,37 @@ export const FertilizationTracker: React.FC<FertilizationTrackerProps> = ({
                 <input
                   type="text"
                   required
-                  value={formData.fertilizerType}
-                  onChange={(e) => setFormData(prev => ({ ...prev, fertilizerType: e.target.value }))}
+                  value={formData.fertilizer_type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, fertilizer_type: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   placeholder="e.g., NPK 20-20-20, Organic Compost"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Concentration
+                  Dosage
                 </label>
                 <input
                   type="text"
-                  value={formData.concentration}
-                  onChange={(e) => setFormData(prev => ({ ...prev, concentration: e.target.value }))}
+                  value={formData.dosage}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dosage: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   placeholder="e.g., 1:1000, 2ml/L"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Application Method
+                  Method
                 </label>
-                <select
+                <input
+                  type="text"
                   value={formData.method}
-                  onChange={(e) => setFormData(prev => ({ ...prev, method: e.target.value as FertilizationRecord['method'] }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, method: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="soil">Soil Application</option>
-                  <option value="foliar">Foliar Spray</option>
-                  <option value="hydroponic">Hydroponic Solution</option>
-                </select>
+                  placeholder="e.g., Soil application, Foliar spray"
+                />
               </div>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Notes
@@ -160,7 +168,6 @@ export const FertilizationTracker: React.FC<FertilizationTrackerProps> = ({
                 placeholder="Observations, plant response, etc..."
               />
             </div>
-
             <div className="flex gap-3">
               <button
                 type="button"
@@ -180,98 +187,85 @@ export const FertilizationTracker: React.FC<FertilizationTrackerProps> = ({
         </div>
       )}
 
-      {/* Plants Grid */}
-      {plants.length === 0 ? (
+      {/* Plants List with Fertilization History */}
+      <div className="space-y-6">
+        {plants.map(plant => {
+          const plantRecords = getRecordsForPlant(plant.plant_name)
+          
+          return (
+            <div key={plant.id} className="bg-white rounded-xl shadow-md overflow-hidden">
+              {/* Plant Header */}
+              <div className="bg-gray-50 px-6 py-4 border-b">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{plant.plant_name}</h3>
+                    <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                      {plant.plant_type && <span>Type: {plant.plant_type}</span>}
+                      {plant.pot_size && <span>Size: {plant.pot_size}</span>}
+                      {plant.location && <span>Location: {plant.location}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fertilization Records */}
+              <div className="p-6">
+                {plantRecords.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Sprout className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600">No fertilization records</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Fertilization History ({plantRecords.length} records)
+                    </h4>
+                    <div className="grid gap-3">
+                      {plantRecords.map(record => (
+                        <div key={record.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-sm font-medium text-gray-900">
+                              {formatDate(record.date)}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Beaker className="w-4 h-4 text-green-500" />
+                              <span className="text-sm font-medium text-gray-700">{record.fertilizer_type}</span>
+                            </div>
+                            {record.dosage && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Dosage:</span> {record.dosage}
+                              </div>
+                            )}
+                            {record.method && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Method:</span> {record.method}
+                              </div>
+                            )}
+                            {record.notes && (
+                              <p className="text-sm text-gray-600 italic">{record.notes}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {plants.length === 0 && (
         <div className="bg-white rounded-xl shadow-md p-12 text-center">
           <Sprout className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No plants yet</h3>
-          <p className="text-gray-600 mb-6">Add your first plant to start tracking fertilization</p>
-          <QuickAddPlant onAdd={onAddPlant} />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {plants.map(plant => {
-            const latestRecord = getLatestRecord(plant.id);
-            const allRecords = getRecordsForPlant(plant.id);
-            
-            return (
-              <div key={plant.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="relative h-32">
-                  <img 
-                    src={plant.imageUrl} 
-                    alt={plant.name}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                  <div className="absolute bottom-2 left-3 text-white">
-                    <h3 className="font-semibold">{plant.name}</h3>
-                    <p className="text-sm opacity-90">{plant.species}</p>
-                  </div>
-                </div>
-
-                <div className="p-4">
-                  {/* Current Reading */}
-                  {latestRecord ? (
-                    <div className="mb-4 p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-green-700">Latest Fertilization</span>
-                        <span className="text-xs text-green-600">{formatDate(latestRecord.date)}</span>
-                      </div>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Beaker className="w-4 h-4 text-green-600" />
-                          <span className="text-gray-700">{latestRecord.fertilizerType}</span>
-                        </div>
-                        {latestRecord.concentration && (
-                          <div className="flex items-center gap-2">
-                            <Droplets className="w-4 h-4 text-blue-500" />
-                            <span className="text-gray-700">{latestRecord.concentration}</span>
-                          </div>
-                        )}
-                        <div className="text-xs text-gray-600 capitalize">
-                          Method: {latestRecord.method}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mb-4 p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                      <span className="text-sm text-gray-600">No fertilization records yet</span>
-                    </div>
-                  )}
-
-                  {/* Previous Records */}
-                  {allRecords.length > 1 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        Previous Records ({allRecords.length - 1})
-                      </h4>
-                      <div className="space-y-2 max-h-32 overflow-y-auto">
-                        {allRecords.slice(1, 4).map(record => (
-                          <div key={record.id} className="text-xs bg-gray-50 p-2 rounded">
-                            <div className="flex justify-between items-start">
-                              <span className="font-medium text-gray-700">{record.fertilizerType}</span>
-                              <span className="text-gray-500">{formatDate(record.date)}</span>
-                            </div>
-                            {record.concentration && (
-                              <div className="text-gray-600 mt-1">{record.concentration}</div>
-                            )}
-                          </div>
-                        ))}
-                        {allRecords.length > 4 && (
-                          <div className="text-xs text-gray-500 text-center py-1">
-                            +{allRecords.length - 4} more records
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          <p className="text-gray-600">Add plants in the Overview tab to start tracking fertilization</p>
         </div>
       )}
     </div>
-  );
-};
+  )
+}

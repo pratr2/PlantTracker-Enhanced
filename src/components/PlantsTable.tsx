@@ -1,21 +1,25 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Plant, SoilHealth, Fertilization, PestControl } from '../types/database'
+import { Plant, SoilHealth, Fertilization, PestControl } from '../types/Plant'
 import { Plus, Edit, Trash2, Leaf } from 'lucide-react'
-
-interface PlantWithDetails extends Plant {
-  latest_soil?: SoilHealth
-  latest_fertilization?: Fertilization
-  latest_pest_control?: PestControl
-}
 
 interface PlantsTableProps {
   userId: string
+  plants: Plant[]
+  soilRecords: SoilHealth[]
+  fertilizationRecords: Fertilization[]
+  pestRecords: PestControl[]
+  onDataChange: () => void
 }
 
-export const PlantsTable: React.FC<PlantsTableProps> = ({ userId }) => {
-  const [plants, setPlantsState] = useState<PlantWithDetails[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+export const PlantsTable: React.FC<PlantsTableProps> = ({ 
+  userId, 
+  plants, 
+  soilRecords, 
+  fertilizationRecords, 
+  pestRecords, 
+  onDataChange 
+}) => {
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingPlant, setEditingPlant] = useState<Plant | null>(null)
   const [formData, setFormData] = useState({
@@ -25,70 +29,6 @@ export const PlantsTable: React.FC<PlantsTableProps> = ({ userId }) => {
     location: '',
     notes: ''
   })
-
-  useEffect(() => {
-    loadPlants()
-  }, [userId])
-
-  const loadPlants = async () => {
-    try {
-      setIsLoading(true)
-      
-      // Get plants
-      const { data: plantsData, error: plantsError } = await supabase
-        .from('plants')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-
-      if (plantsError) throw plantsError
-
-      // Get latest records for each plant
-      const plantsWithDetails: PlantWithDetails[] = []
-      
-      for (const plant of plantsData || []) {
-        // Latest soil health
-        const { data: soilData } = await supabase
-          .from('soil_health')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('plant_name', plant.plant_name)
-          .order('date', { ascending: false })
-          .limit(1)
-
-        // Latest fertilization
-        const { data: fertData } = await supabase
-          .from('fertilization')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('plant_name', plant.plant_name)
-          .order('date', { ascending: false })
-          .limit(1)
-
-        // Latest pest control
-        const { data: pestData } = await supabase
-          .from('pest_control')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('plant_name', plant.plant_name)
-          .order('date', { ascending: false })
-          .limit(1)
-
-        plantsWithDetails.push({
-          ...plant,
-          latest_soil: soilData?.[0],
-          latest_fertilization: fertData?.[0],
-          latest_pest_control: pestData?.[0]
-        })
-      }
-
-      setPlantsState(plantsWithDetails)
-    } catch (error) {
-      console.error('Error loading plants:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -122,7 +62,7 @@ export const PlantsTable: React.FC<PlantsTableProps> = ({ userId }) => {
       })
       setShowAddForm(false)
       setEditingPlant(null)
-      loadPlants()
+      onDataChange()
     } catch (error) {
       console.error('Error saving plant:', error)
     }
@@ -150,23 +90,27 @@ export const PlantsTable: React.FC<PlantsTableProps> = ({ userId }) => {
         .eq('id', plantId)
       
       if (error) throw error
-      loadPlants()
+      onDataChange()
     } catch (error) {
       console.error('Error deleting plant:', error)
     }
   }
 
+  const getLatestSoilRecord = (plantName: string) => {
+    return soilRecords.find(record => record.plant_name === plantName)
+  }
+
+  const getLatestFertilizationRecord = (plantName: string) => {
+    return fertilizationRecords.find(record => record.plant_name === plantName)
+  }
+
+  const getLatestPestRecord = (plantName: string) => {
+    return pestRecords.find(record => record.plant_name === plantName)
+  }
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never'
     return new Date(dateString).toLocaleDateString()
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-      </div>
-    )
   }
 
   return (
@@ -178,8 +122,8 @@ export const PlantsTable: React.FC<PlantsTableProps> = ({ userId }) => {
             <Leaf className="w-6 h-6 text-emerald-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">My Plants</h1>
-            <p className="text-gray-600">Manage your plant collection and track their health</p>
+            <h1 className="text-2xl font-bold text-gray-900">Plant Overview</h1>
+            <p className="text-gray-600">Summary of all your plants and their current status</p>
           </div>
         </div>
         <button
@@ -330,67 +274,73 @@ export const PlantsTable: React.FC<PlantsTableProps> = ({ userId }) => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {plants.map((plant) => (
-                  <tr key={plant.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{plant.plant_name}</div>
-                        <div className="text-sm text-gray-500">{plant.plant_type}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {plant.location || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {plant.latest_soil?.ph ? (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          plant.latest_soil.ph >= 6.0 && plant.latest_soil.ph <= 7.0
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {plant.latest_soil.ph}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">No data</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {plant.latest_soil?.tds_ppm ? (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          plant.latest_soil.tds_ppm >= 500 && plant.latest_soil.tds_ppm <= 1000
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {plant.latest_soil.tds_ppm}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">No data</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(plant.latest_fertilization?.date)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(plant.latest_pest_control?.date)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEdit(plant)}
-                          className="text-emerald-600 hover:text-emerald-900"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(plant.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {plants.map((plant) => {
+                  const latestSoil = getLatestSoilRecord(plant.plant_name)
+                  const latestFert = getLatestFertilizationRecord(plant.plant_name)
+                  const latestPest = getLatestPestRecord(plant.plant_name)
+
+                  return (
+                    <tr key={plant.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{plant.plant_name}</div>
+                          <div className="text-sm text-gray-500">{plant.plant_type}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {plant.location || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {latestSoil?.ph ? (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            latestSoil.ph >= 6.0 && latestSoil.ph <= 7.0
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {latestSoil.ph}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">No data</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {latestSoil?.tds_ppm ? (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            latestSoil.tds_ppm >= 500 && latestSoil.tds_ppm <= 1000
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {latestSoil.tds_ppm}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">No data</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatDate(latestFert?.date)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatDate(latestPest?.date)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEdit(plant)}
+                            className="text-emerald-600 hover:text-emerald-900"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(plant.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                )}
               </tbody>
             </table>
           </div>

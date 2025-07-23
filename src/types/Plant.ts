@@ -1,48 +1,46 @@
 export interface Plant {
   id: string;
-  name: string;
-  species: string;
-  location: string;
-  imageUrl: string;
-  dateAcquired: string;
-  notes: string;
-  healthStatus: 'excellent' | 'good' | 'fair' | 'poor';
+  user_id: string;
+  plant_name: string;
+  plant_type?: string;
+  pot_size?: string;
+  location?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface FertilizationRecord {
+export interface SoilHealth {
   id: string;
-  plantId: string;
+  user_id: string;
+  plant_name: string;
   date: string;
-  fertilizerType: string;
-  concentration: string; // e.g., "1:1000", "2ml/L"
-  method: 'foliar' | 'soil' | 'hydroponic';
-  notes: string;
+  tds_ppm?: number;
+  ph?: number;
+  notes?: string;
+  created_at?: string;
 }
 
-export interface PestRecord {
+export interface Fertilization {
   id: string;
-  plantId: string;
+  user_id: string;
+  plant_name: string;
   date: string;
-  pestType: string;
-  severity: 'low' | 'medium' | 'high';
-  treatmentUsed: string;
-  treatmentMethod: string;
-  effectiveness: 'excellent' | 'good' | 'fair' | 'poor' | 'pending';
-  notes: string;
+  fertilizer_type: string;
+  dosage?: string;
+  method?: string;
+  notes?: string;
+  created_at?: string;
 }
 
-export interface SoilRecord {
+export interface PestControl {
   id: string;
-  plantId: string;
+  user_id: string;
+  plant_name: string;
   date: string;
-  tds: number; // Total Dissolved Solids in ppm
-  ph: number;
-  temperature?: number; // Optional soil temperature
-  notes: string;
+  pest_type?: string;
+  treatment: string;
+  method?: string;
+  notes?: string;
+  created_at?: string;
 }
-
-export type TrackingData = {
-  fertilization: FertilizationRecord[];
-  pest: PestRecord[];
-  soil: SoilRecord[];
-};

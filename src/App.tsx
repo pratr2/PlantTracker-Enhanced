@@ -1,17 +1,31 @@
 import React, { useState, useEffect } from 'react'
-import { Leaf, Eye, EyeOff } from 'lucide-react'
+import { Leaf, Eye, EyeOff, BarChart3, Droplets, Sprout, Bug } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import { Plant, SoilHealth, Fertilization, PestControl } from './types/Plant'
 import { ChatBot } from './components/ChatBot'
 import { PlantsTable } from './components/PlantsTable'
+import { SoilTracker } from './components/SoilTracker'
+import { FertilizationTracker } from './components/FertilizationTracker'
+import { PestTracker } from './components/PestTracker'
+
+type TabType = 'overview' | 'soil' | 'fertilization' | 'pest'
 
 function App() {
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
+  const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
+
+  // Data states
+  const [plants, setPlantsState] = useState<Plant[]>([])
+  const [soilRecords, setSoilRecords] = useState<SoilHealth[]>([])
+  const [fertilizationRecords, setFertilizationRecords] = useState<Fertilization[]>([])
+  const [pestRecords, setPestRecords] = useState<PestControl[]>([])
+  const [dataLoading, setDataLoading] = useState(false)
 
   useEffect(() => {
     // Check if user is already logged in
@@ -27,6 +41,65 @@ function App() {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // Load all data when user is authenticated
+  useEffect(() => {
+    if (user) {
+      loadAllData()
+    }
+  }, [user])
+
+  const loadAllData = async () => {
+    if (!user) return
+    
+    setDataLoading(true)
+    try {
+      // Load plants
+      const { data: plantsData, error: plantsError } = await supabase
+        .from('plants')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (plantsError) throw plantsError
+      setPlantsState(plantsData || [])
+
+      // Load soil health records
+      const { data: soilData, error: soilError } = await supabase
+        .from('soil_health')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+
+      if (soilError) throw soilError
+      setSoilRecords(soilData || [])
+
+      // Load fertilization records
+      const { data: fertData, error: fertError } = await supabase
+        .from('fertilization')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+
+      if (fertError) throw fertError
+      setFertilizationRecords(fertData || [])
+
+      // Load pest control records
+      const { data: pestData, error: pestError } = await supabase
+        .from('pest_control')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+
+      if (pestError) throw pestError
+      setPestRecords(pestData || [])
+
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setDataLoading(false)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,7 +124,18 @@ function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setUser(null)
+    setPlantsState([])
+    setSoilRecords([])
+    setFertilizationRecords([])
+    setPestRecords([])
   }
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: BarChart3 },
+    { id: 'soil', label: 'Soil Health', icon: Droplets },
+    { id: 'fertilization', label: 'Fertilization', icon: Sprout },
+    { id: 'pest', label: 'Pest Control', icon: Bug }
+  ]
 
   if (isLoading) {
     return (
@@ -167,12 +251,78 @@ function App() {
         </div>
       </header>
 
+      {/* Tab Navigation */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-8">
+            {tabs.map((tab) => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as TabType)}
+                  className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-emerald-500 text-emerald-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <PlantsTable userId={user.id} />
+        {dataLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'overview' && (
+              <PlantsTable 
+                userId={user.id} 
+                plants={plants}
+                soilRecords={soilRecords}
+                fertilizationRecords={fertilizationRecords}
+                pestRecords={pestRecords}
+                onDataChange={loadAllData}
+              />
+            )}
+            {activeTab === 'soil' && (
+              <SoilTracker 
+                plants={plants}
+                soilRecords={soilRecords}
+                userId={user.id}
+                onDataChange={loadAllData}
+              />
+            )}
+            {activeTab === 'fertilization' && (
+              <FertilizationTracker 
+                plants={plants}
+                fertilizationRecords={fertilizationRecords}
+                userId={user.id}
+                onDataChange={loadAllData}
+              />
+            )}
+            {activeTab === 'pest' && (
+              <PestTracker 
+                plants={plants}
+                pestRecords={pestRecords}
+                userId={user.id}
+                onDataChange={loadAllData}
+              />
+            )}
+          </>
+        )}
       </main>
 
-      {/* ChatBot */}
+      {/* ChatBot - Fixed position, always visible */}
       <ChatBot userId={user.id} />
     </div>
   )
