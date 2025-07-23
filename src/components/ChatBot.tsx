@@ -65,7 +65,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ userId }) => {
       await supabase.from('chat_messages').insert([userMessage])
 
       // Call edge function for ChatGPT response
-      const response = await supabase.functions.invoke('chat-gpt', {
+      const response = await supabase.functions.invoke('openai-chat', {
         body: { 
           message: inputMessage.trim(),
           userId: userId
