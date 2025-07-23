@@ -3,6 +3,17 @@ export interface Plant {
   user_id: string
   plant_name: string
   plant_type?: string
+  species?: string
+  image_url?: string
+  date_acquired?: string
+  watering_frequency?: number
+  fertilizing_frequency?: number
+  repotting_frequency?: number
+  last_watered?: string
+  last_fertilized?: string
+  last_repotted?: string
+  health_status?: string
+  care_instructions?: string
   pot_size?: string
   location?: string
   notes?: string
