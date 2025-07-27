@@ -102,12 +102,12 @@ export const ChatBot: React.FC<ChatBotProps> = ({
       }
 
       const assistantRawContent = response.data.choices?.[0]?.message?.content || 'Sorry, I encountered an error generating a response.'
-      let aiMessageContent = assistantRawContent // Default to raw AI response
+      let aiMessageContent = assistantRawContent
 
       try {
         const parsedResponse = JSON.parse(assistantRawContent)
         if (parsedResponse.type === 'action') {
-          aiMessageContent = parsedResponse.message // Use the message from the structured response
+          aiMessageContent = parsedResponse.message
           switch (parsedResponse.action) {
             case 'addPlant':
               await onAddPlant(parsedResponse.data)
@@ -127,6 +127,16 @@ export const ChatBot: React.FC<ChatBotProps> = ({
             case 'addPestControl':
               await onAddPestControl(parsedResponse.data)
               break
+            case 'getPlants':
+            case 'getPlantById':
+            case 'waterPlant':
+            case 'fertilizePlant':
+            case 'repotPlant':
+            case 'getFertilizationHistory':
+            case 'getSoilHistory':
+            case 'getPestControlHistory':
+              // These actions don't require frontend updates, just display the message
+              break
             default:
               console.warn('Unknown action type from AI:', parsedResponse.action)
           }
@@ -141,7 +151,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({
       const assistantMessage: Omit<ChatMessage, 'id' | 'created_at'> = {
         user_id: userId,
         role: 'assistant',
-        content: aiMessageContent, // Use the potentially updated message
+        content: aiMessageContent,
         timestamp: new Date().toISOString()
       }
 
@@ -218,6 +228,25 @@ export const ChatBot: React.FC<ChatBotProps> = ({
               <div className="text-center text-gray-500 mt-8">
                 <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">Ask me anything about plant care!</p>
+                <p className="text-xs mt-2 text-gray-400">
+                  I can help you:
+                </p>
+                <ul className="text-xs mt-1 text-gray-400 space-y-1">
+                  <li>• Add, update, or delete plants</li>
+                  <li>• Water, fertilize, or repot plants</li>
+                  <li>• Track fertilization, soil health, and pest control</li>
+                  <li>• Get plant care advice</li>
+                </ul>
+                <div className="mt-4 text-xs text-gray-400">
+                  <p className="font-medium mb-2">Try asking:</p>
+                  <div className="space-y-1 text-left">
+                    <p>• "Add a new Monstera plant"</p>
+                    <p>• "Water my snake plant"</p>
+                    <p>• "Show me all my plants"</p>
+                    <p>• "Update my orchid's care instructions"</p>
+                    <p>• "Add a fertilization record for my pothos"</p>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
