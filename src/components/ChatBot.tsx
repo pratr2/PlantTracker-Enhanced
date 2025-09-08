@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { MessageCircle, Send, X, Minimize2 } from 'lucide-react'
+import { MessageCircle, Send, X, Minimize2, Camera, FileText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { ChatMessage } from '../types/database'
 import { Plant, Fertilization, SoilHealth, PestControl } from '../types/Plant'
@@ -29,6 +29,8 @@ export const ChatBot: React.FC<ChatBotProps> = ({
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -60,6 +62,200 @@ export const ChatBot: React.FC<ChatBotProps> = ({
     }
   }
 
+  const handleImageUpload = async (file: File) => {
+    if (!file) return
+
+    // Convert image to base64 for OpenAI
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const base64Image = e.target?.result as string
+      const imageData = base64Image.split(',')[1] // Remove data:image/jpeg;base64, prefix
+
+      // Add image message to chat
+      const imageMessage: Omit<ChatMessage, 'id' | 'created_at'> = {
+        user_id: userId,
+        role: 'user',
+        content: `[Image uploaded: ${file.name}]`,
+        attachments: [{ type: 'image', data: imageData, filename: file.name }],
+        timestamp: new Date().toISOString()
+      }
+
+      setMessages(prev => [...prev, { ...imageMessage, id: Date.now().toString() }])
+      setInputMessage('')
+      setIsLoading(true)
+
+      try {
+        // Save image message to database
+        await supabase.from('chat_messages').insert([imageMessage])
+
+        // Call edge function with image
+        const response = await supabase.functions.invoke('openai-chat', {
+          body: { 
+            messages: [
+              ...messages.map(msg => ({
+                role: msg.role,
+                content: msg.content,
+                ...(msg.attachments && { attachments: msg.attachments })
+              })),
+              {
+                role: 'user',
+                content: `Please analyze this plant image and help me identify any issues or provide care advice.`,
+                attachments: [{ type: 'image', data: imageData, filename: file.name }]
+              }
+            ],
+            userId: userId
+          }
+        })
+
+        if (response.error) {
+          console.error('Edge function error:', response.error)
+          throw new Error('Failed to get AI response')
+        }
+
+        const assistantRawContent = response.data.choices?.[0]?.message?.content || 'Sorry, I encountered an error analyzing the image.'
+        let aiMessageContent = assistantRawContent
+
+        try {
+          const parsedResponse = JSON.parse(assistantRawContent)
+          if (parsedResponse.type === 'action') {
+            aiMessageContent = parsedResponse.message
+            // Handle any actions from image analysis
+          } else if (parsedResponse.type === 'chat') {
+            aiMessageContent = parsedResponse.message
+          }
+        } catch (e) {
+          console.log('AI response was not structured JSON, treating as plain text.')
+        }
+
+        const assistantMessage: Omit<ChatMessage, 'id' | 'created_at'> = {
+          user_id: userId,
+          role: 'assistant',
+          content: aiMessageContent,
+          timestamp: new Date().toISOString()
+        }
+
+        setMessages(prev => [...prev, { ...assistantMessage, id: Date.now().toString() + '_ai' }])
+        await supabase.from('chat_messages').insert([assistantMessage])
+
+      } catch (error) {
+        console.error('Error processing image:', error)
+        setMessages(prev => [...prev, {
+          id: Date.now().toString() + '_error',
+          user_id: userId,
+          role: 'assistant',
+          content: 'Sorry, I encountered an error analyzing the image. Please try again.',
+          timestamp: new Date().toISOString()
+        }])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleFileUpload = async (file: File) => {
+    if (!file) return
+
+    // Check file type
+    const validTypes = ['.csv', '.xlsx', '.xls']
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+    
+    if (!validTypes.includes(fileExtension)) {
+      alert('Please upload a CSV or Excel file (.csv, .xlsx, .xls)')
+      return
+    }
+
+    // Add file message to chat
+    const fileMessage: Omit<ChatMessage, 'id' | 'created_at'> = {
+      user_id: userId,
+      role: 'user',
+      content: `[File uploaded: ${file.name}]`,
+      attachments: [{ type: 'file', filename: file.name }],
+      timestamp: new Date().toISOString()
+    }
+
+    setMessages(prev => [...prev, { ...fileMessage, id: Date.now().toString() }])
+    setInputMessage('')
+    setIsLoading(true)
+
+    // Read file content
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const fileContent = e.target?.result as string
+
+      try {
+        // Call edge function with file data
+        const response = await supabase.functions.invoke('openai-chat', {
+          body: { 
+            messages: [
+              ...messages.map(msg => ({
+                role: msg.role,
+                content: msg.content,
+                ...(msg.attachments && { attachments: msg.attachments })
+              })),
+              {
+                role: 'user',
+                content: `Please analyze this plant data file and help me import or update my plant records. File: ${file.name}`,
+                attachments: [{ type: 'file', data: fileContent, filename: file.name }]
+              }
+            ],
+            userId: userId
+          }
+        })
+
+        if (response.error) {
+          console.error('Edge function error:', response.error)
+          throw new Error('Failed to get AI response')
+        }
+
+        const assistantRawContent = response.data.choices?.[0]?.message?.content || 'Sorry, I encountered an error processing the file.'
+        let aiMessageContent = assistantRawContent
+
+        try {
+          const parsedResponse = JSON.parse(assistantRawContent)
+          if (parsedResponse.type === 'action') {
+            aiMessageContent = parsedResponse.message
+            // Handle bulk import actions
+            if (parsedResponse.action === 'bulkImport') {
+              // Handle bulk import of plants
+              for (const plantData of parsedResponse.data.plants) {
+                await onAddPlant(plantData)
+              }
+            }
+          } else if (parsedResponse.type === 'chat') {
+            aiMessageContent = parsedResponse.message
+          }
+        } catch (e) {
+          console.log('AI response was not structured JSON, treating as plain text.')
+        }
+
+        const assistantMessage: Omit<ChatMessage, 'id' | 'created_at'> = {
+          user_id: userId,
+          role: 'assistant',
+          content: aiMessageContent,
+          timestamp: new Date().toISOString()
+        }
+
+        setMessages(prev => [...prev, { ...assistantMessage, id: Date.now().toString() + '_ai' }])
+        await supabase.from('chat_messages').insert([assistantMessage])
+
+      } catch (error) {
+        console.error('Error processing file:', error)
+        setMessages(prev => [...prev, {
+          id: Date.now().toString() + '_error',
+          user_id: userId,
+          role: 'assistant',
+          content: 'Sorry, I encountered an error processing the file. Please try again.',
+          timestamp: new Date().toISOString()
+        }])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    reader.readAsText(file)
+  }
+
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return
 
@@ -85,7 +281,8 @@ export const ChatBot: React.FC<ChatBotProps> = ({
           messages: [
             ...messages.map(msg => ({
               role: msg.role,
-              content: msg.content
+              content: msg.content,
+              ...(msg.attachments && { attachments: msg.attachments })
             })),
             {
               role: 'user',
@@ -115,7 +312,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({
             case 'updatePlant':
               await onUpdatePlant(parsedResponse.data.id, parsedResponse.data.updates)
               break
-            case 'deletePlant':
+            case 'delete_plant':
               await onDeletePlant(parsedResponse.data.id)
               break
             case 'addFertilization':
@@ -183,6 +380,14 @@ export const ChatBot: React.FC<ChatBotProps> = ({
     }
   }
 
+  const triggerImageUpload = () => {
+    imageInputRef.current?.click()
+  }
+
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click()
+  }
+
   if (!isOpen) {
     return (
       <button
@@ -235,6 +440,8 @@ export const ChatBot: React.FC<ChatBotProps> = ({
                   <li>• Add, update, or delete plants</li>
                   <li>• Water, fertilize, or repot plants</li>
                   <li>• Track fertilization, soil health, and pest control</li>
+                  <li>• 📸 Analyze plant photos for issues</li>
+                  <li>• 📄 Import plant data from files</li>
                   <li>• Get plant care advice</li>
                 </ul>
                 <div className="mt-4 text-xs text-gray-400">
@@ -263,6 +470,11 @@ export const ChatBot: React.FC<ChatBotProps> = ({
                       }`}
                     >
                       {message.content}
+                      {message.attachments && message.attachments.length > 0 && (
+                        <div className="mt-2 text-xs opacity-75">
+                          📎 {message.attachments[0].filename}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -282,9 +494,30 @@ export const ChatBot: React.FC<ChatBotProps> = ({
             )}
           </div>
 
+
+
           {/* Input */}
           <div className="p-3 border-t">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-end">
+              {/* Upload Icons */}
+              <div className="flex gap-1">
+                <button
+                  onClick={triggerImageUpload}
+                  className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Upload image"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={triggerFileUpload}
+                  className="p-2 text-gray-500 hover:text-green-500 hover:bg-green-50 rounded-lg transition-colors"
+                  title="Upload file"
+                >
+                  <FileText className="w-4 h-4" />
+                </button>
+              </div>
+              
+              {/* Text Input */}
               <input
                 type="text"
                 value={inputMessage}
@@ -294,15 +527,42 @@ export const ChatBot: React.FC<ChatBotProps> = ({
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 disabled={isLoading}
               />
+              
+              {/* Send Button */}
               <button
                 onClick={sendMessage}
                 disabled={!inputMessage.trim() || isLoading}
                 className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 text-white p-2 rounded-lg transition-colors"
+                title="Send message"
               >
                 <Send className="w-4 h-4" />
               </button>
             </div>
           </div>
+
+          {/* Hidden file inputs */}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) handleImageUpload(file)
+              e.target.value = '' // Reset input
+            }}
+            className="hidden"
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) handleFileUpload(file)
+              e.target.value = '' // Reset input
+            }}
+            className="hidden"
+          />
         </>
       )}
     </div>

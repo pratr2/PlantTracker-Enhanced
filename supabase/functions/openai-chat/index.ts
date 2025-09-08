@@ -122,119 +122,71 @@ serve(async (req) => {
       throw new Error('Messages array is required');
     }
 
-    const hasImages = messages.some((msg) => Array.isArray(msg.content) && msg.content.some((item) => item.type === 'image_url'));
+    const hasImages = messages.some((msg) => 
+      msg.attachments && msg.attachments.some((att) => att.type === 'image')
+    );
 
-    // Add system message to help AI understand its capabilities
+    // Limit chat history to last 10 messages
+    const limitedMessages = messages.slice(-10);
+
+    // Concise system message
     const systemMessage = {
       role: 'system',
-      content: `You are a helpful plant care assistant with the ability to modify plant data in a database. You have access to functions that can directly modify the database.
-
-IMPORTANT: When users ask to modify data, you MUST use the available functions. Do not say you cannot modify the database - you can and should use the functions provided.
-
-You can:
-1. Add new plants with details like name, species, care instructions
-2. Update existing plant information (watering schedule, notes, location, etc.)
-3. Mark plants as watered, fertilized, or repotted
-4. Add care records (fertilization, soil health, pest control)
-5. Get plant information and history
-6. Provide general plant care advice
-
-When users ask to modify data, ALWAYS use the appropriate functions:
-- "Add a new snake plant" → use add_plant function
-- "Water my Monstera" → use water_plant function
-- "Update my orchid's care instructions" → use update_plant function
-- "Show me all my plants" → use get_plants function
-- "Fertilize my pothos" → use fertilize_plant function
-- "Repot my cactus" → use repot_plant function
-
-You have the ability to modify the database directly through these functions. Always use them when users request data modifications.`
+      content: `You are a plant care assistant. You can add, update, and retrieve plant data, mark care actions, and provide plant care advice. You can also analyze plant images for health issues and process plant data files. Use the provided functions to modify or fetch data as needed.`
     };
 
+    // Simplified function descriptions
     const functionSpecs = [
       {
         name: 'add_plant',
-        description: 'Add a new plant to the user\'s collection',
+        description: 'Add a plant',
         parameters: {
           type: 'object',
           properties: {
-            plant_name: { type: 'string', description: 'Name of the plant' },
-            plant_type: { type: 'string', description: 'Type of plant' },
-            species: { type: 'string', description: 'Species of the plant' },
-            image_url: { type: 'string', description: 'URL of plant image' },
-            date_acquired: { type: 'string', format: 'date', description: 'Date when plant was acquired' },
-            watering_frequency: { type: 'number', description: 'Watering frequency in days' },
-            fertilizing_frequency: { type: 'number', description: 'Fertilizing frequency in days' },
-            repotting_frequency: { type: 'number', description: 'Repotting frequency in days' },
-            health_status: { type: 'string', description: 'Current health status' },
-            care_instructions: { type: 'string', description: 'Care instructions for the plant' },
-            pot_size: { type: 'string', description: 'Size of the pot' },
-            location: { type: 'string', description: 'Location of the plant' },
-            notes: { type: 'string', description: 'Additional notes about the plant' }
+            plant_name: { type: 'string' },
+            plant_type: { type: 'string' },
+            species: { type: 'string' },
+            image_url: { type: 'string' },
+            date_acquired: { type: 'string', format: 'date' },
+            watering_frequency: { type: 'number' },
+            fertilizing_frequency: { type: 'number' },
+            repotting_frequency: { type: 'number' },
+            health_status: { type: 'string' },
+            care_instructions: { type: 'string' },
+            pot_size: { type: 'string' },
+            location: { type: 'string' },
+            notes: { type: 'string' }
           },
           required: ['plant_name']
         }
       },
       {
         name: 'get_plants',
-        description: 'Get all plants for the current user',
-        parameters: {
-          type: 'object',
-          properties: {},
-          required: []
-        }
+        description: 'Get all plants',
+        parameters: { type: 'object', properties: {}, required: [] }
       },
       {
         name: 'water_plant',
         description: 'Mark a plant as watered',
-        parameters: {
-          type: 'object',
-          properties: {
-            plant_id: {
-              type: 'string',
-              description: 'The ID of the plant to water'
-            }
-          },
-          required: ['plant_id']
-        }
+        parameters: { type: 'object', properties: { plant_id: { type: 'string' } }, required: ['plant_id'] }
       },
       {
         name: 'fertilize_plant',
         description: 'Mark a plant as fertilized',
-        parameters: {
-          type: 'object',
-          properties: {
-            plant_id: {
-              type: 'string',
-              description: 'The ID of the plant to fertilize'
-            }
-          },
-          required: ['plant_id']
-        }
+        parameters: { type: 'object', properties: { plant_id: { type: 'string' } }, required: ['plant_id'] }
       },
       {
         name: 'repot_plant',
         description: 'Mark a plant as repotted',
-        parameters: {
-          type: 'object',
-          properties: {
-            plant_id: {
-              type: 'string',
-              description: 'The ID of the plant to repot'
-            }
-          },
-          required: ['plant_id']
-        }
+        parameters: { type: 'object', properties: { plant_id: { type: 'string' } }, required: ['plant_id'] }
       },
       {
         name: 'update_plant',
-        description: 'Update plant information',
+        description: 'Update plant info',
         parameters: {
           type: 'object',
           properties: {
-            plant_id: {
-              type: 'string',
-              description: 'The ID of the plant to update'
-            },
+            plant_id: { type: 'string' },
             updates: {
               type: 'object',
               properties: {
@@ -259,12 +211,42 @@ You have the ability to modify the database directly through these functions. Al
           },
           required: ['plant_id', 'updates']
         }
+      },
+      {
+        name: 'bulk_import_plants',
+        description: 'Import multiple plants from file data',
+        parameters: {
+          type: 'object',
+          properties: {
+            plants: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  plant_name: { type: 'string' },
+                  plant_type: { type: 'string' },
+                  species: { type: 'string' },
+                  watering_frequency: { type: 'number' },
+                  fertilizing_frequency: { type: 'number' },
+                  repotting_frequency: { type: 'number' },
+                  health_status: { type: 'string' },
+                  care_instructions: { type: 'string' },
+                  pot_size: { type: 'string' },
+                  location: { type: 'string' },
+                  notes: { type: 'string' }
+                },
+                required: ['plant_name']
+              }
+            }
+          },
+          required: ['plants']
+        }
       }
     ];
 
     const openaiRequest: any = {
       model: hasImages ? 'gpt-4o' : model,
-      messages: [systemMessage, ...messages],
+      messages: [systemMessage, ...limitedMessages],
       max_tokens: 2000,
       temperature: 0.7,
       functions: functionSpecs,
@@ -367,6 +349,19 @@ You have the ability to modify the database directly through these functions. Al
             const { error } = await supabase.from('plants').update(updates).eq('id', plant_id).eq('user_id', userId);
             if (error) throw error;
             responseMessage = 'Plant updated successfully!';
+            break;
+          }
+        case 'bulk_import_plants':
+          {
+            const { plants } = args;
+            const plantsWithUserId = plants.map((plant: any) => ({
+              user_id: userId,
+              ...plant
+            }));
+            
+            const { error } = await supabase.from('plants').insert(plantsWithUserId);
+            if (error) throw error;
+            responseMessage = `Successfully imported ${plants.length} plants!`;
             break;
           }
         default:
